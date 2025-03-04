@@ -25,8 +25,8 @@ dependencies {
         resolutionStrategy.cacheChangingModulesFor 0,'seconds'
         resolutionStrategy.cacheDynamicVersionsFor 0,'seconds'
     }
-    api 'com.faceunity:core:8.7.0'
-    api 'com.faceunity:model:8.7.0'
+    api 'com.faceunity:core:8.13.0'
+    api 'com.faceunity:model:8.13.0'
 
     api "androidx.recyclerview:recyclerview:1.0.0"
     implementation 'androidx.appcompat:appcompat:1.1.0'
