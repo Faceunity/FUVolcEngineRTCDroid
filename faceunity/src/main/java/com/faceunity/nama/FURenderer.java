@@ -142,7 +142,7 @@ public class FURenderer extends IFURenderer {
         config.setCameraFacing(cameraFacing);
         config.setOutputMatrix(outputMatrix);
         mCallStartTime = System.nanoTime();
-        if (FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_MID)//高性能设备
+        if (FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_TWO)//高性能设备
             cheekFaceNum();
         FURenderOutputData outputData = mFURenderKit.renderWithInput(inputData);
         mSumCallTime += System.nanoTime() - mCallStartTime;

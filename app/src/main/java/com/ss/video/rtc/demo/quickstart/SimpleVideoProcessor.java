@@ -94,7 +94,7 @@ public class SimpleVideoProcessor extends IVideoProcessor {
             return frame;
         }
         mFURenderer.setInputOrientation(frame.getRotation().value());
-        if (FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_MID){
+        if (FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_TWO){
             //高性能设备
             mFURenderer.cheekFaceNum();
         }
@@ -133,7 +133,7 @@ public class SimpleVideoProcessor extends IVideoProcessor {
         }
 
         mFURenderer.setInputOrientation(frame.getRotation().value());
-        if (FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_MID){
+        if (FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_TWO){
             //高性能设备
             mFURenderer.cheekFaceNum();
         }
