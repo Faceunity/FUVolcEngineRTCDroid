@@ -51,6 +51,7 @@ public class BodyBeautySource {
         params.put(BodyBeautyParam.HIP_SLIM_INTENSITY, new ModelAttributeData(0.0, 0.0, 0.0, 1.0));
         params.put(BodyBeautyParam.HEAD_SLIM_INTENSITY, new ModelAttributeData(0.0, 0.0, 0.0, 1.0));
         params.put(BodyBeautyParam.LEG_SLIM_INTENSITY, new ModelAttributeData(0.0, 0.0, 0.0, 1.0));
+        params.put(BodyBeautyParam.BREAST_INTENSITY, new ModelAttributeData(0.0, 0.0, 0.0, 1.0));
         return params;
     }
 }
