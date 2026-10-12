@@ -30,8 +30,11 @@ public interface FURendererListener {
      */
     void onFpsChanged(double fps, double callTime);
 
-    void onProcessTime(long processTime);
 
+    /**
+     * release完成回调
+     */
     void onRelease();
+
 
 }

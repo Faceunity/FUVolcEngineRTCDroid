@@ -13,7 +13,9 @@ import androidx.annotation.NonNull;
 import com.faceunity.core.callback.OnReadBitmapCallback;
 import com.faceunity.core.enumeration.FUInputBufferEnum;
 import com.faceunity.core.enumeration.FUInputTextureEnum;
+import com.faceunity.core.faceunity.FUAIKit;
 import com.faceunity.core.faceunity.FURenderKit;
+import com.faceunity.core.model.facebeauty.FaceBeautyBlurTypeEnum;
 import com.faceunity.core.utils.BitmapUtils;
 import com.faceunity.core.utils.GlUtil;
 import com.faceunity.nama.FUConfig;
@@ -67,7 +69,6 @@ public class SimpleVideoProcessor extends IVideoProcessor {
     @Override
     public void onGLEnvInitiated() {
         initGL();
-        mFURenderer.init();
     }
 
     @Override
@@ -94,9 +95,9 @@ public class SimpleVideoProcessor extends IVideoProcessor {
             return frame;
         }
         mFURenderer.setInputOrientation(frame.getRotation().value());
-        if (FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_MID){
+        if (FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_TWO){
             //高性能设备
-            mFURenderer.cheekFaceNum();
+            cheekFaceNum();
         }
         mFURenderer.setInputBufferType(FUInputBufferEnum.FU_FORMAT_I420_BUFFER);
         int texId = mFURenderer.onDrawFrameDualInput(null,
@@ -121,6 +122,26 @@ public class SimpleVideoProcessor extends IVideoProcessor {
         return builder.build();
     }
 
+    /**
+     * 检查当前人脸数量
+     */
+    private void cheekFaceNum() {
+        //根据有无人脸 + 设备性能 判断开启的磨皮类型
+        float faceProcessorGetConfidenceScore = FUAIKit.getInstance().getFaceProcessorGetConfidenceScore(0);
+        if (faceProcessorGetConfidenceScore >= 0.95) {
+            //高端手机并且检测到人脸开启均匀磨皮，人脸点位质
+            if (FURenderKit.getInstance() != null && FURenderKit.getInstance().getFaceBeauty() != null && FURenderKit.getInstance().getFaceBeauty().getBlurType() != FaceBeautyBlurTypeEnum.EquallySkin) {
+                FURenderKit.getInstance().getFaceBeauty().setBlurType(FaceBeautyBlurTypeEnum.EquallySkin);
+                FURenderKit.getInstance().getFaceBeauty().setEnableBlurUseMask(true);
+            }
+        } else {
+            if (FURenderKit.getInstance() != null && FURenderKit.getInstance().getFaceBeauty() != null && FURenderKit.getInstance().getFaceBeauty().getBlurType() != FaceBeautyBlurTypeEnum.FineSkin) {
+                FURenderKit.getInstance().getFaceBeauty().setBlurType(FaceBeautyBlurTypeEnum.FineSkin);
+                FURenderKit.getInstance().getFaceBeauty().setEnableBlurUseMask(false);
+            }
+        }
+    }
+
     public synchronized VideoFrame processTextureFrame(VideoFrame frame) {
         Log.d("SimpleVideoProcessor", "processTextureFrame frame rotation: " + frame.getRotation().value());
         if (!renderSwitch) {
@@ -133,9 +154,9 @@ public class SimpleVideoProcessor extends IVideoProcessor {
         }
 
         mFURenderer.setInputOrientation(frame.getRotation().value());
-        if (FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_MID){
+        if (FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_TWO){
             //高性能设备
-            mFURenderer.cheekFaceNum();
+            cheekFaceNum();
         }
         mFURenderer.setInputTextureType(FUInputTextureEnum.FU_ADM_FLAG_COMMON_TEXTURE);
         int texId = mFURenderer.onDrawFrameDualInput(

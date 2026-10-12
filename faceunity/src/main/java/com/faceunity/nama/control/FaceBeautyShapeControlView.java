@@ -4,9 +4,8 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.widget.SwitchCompat;
 import androidx.recyclerview.widget.RecyclerView;
-
+import androidx.appcompat.widget.SwitchCompat;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -86,13 +85,6 @@ public class FaceBeautyShapeControlView extends BaseControlView {
         }
 
         setRecoverEnable(checkFaceShapeChanged());
-    }
-
-    public void updateOnSelected() {
-        if (switchCompat != null) {
-            boolean enabled = mDataFactory == null || mDataFactory.isFaceBeautyEnabled();
-            switchCompat.setChecked(enabled);
-        }
     }
 
     private void init() {

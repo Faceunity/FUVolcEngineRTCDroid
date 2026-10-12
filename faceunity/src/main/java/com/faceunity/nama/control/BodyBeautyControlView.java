@@ -1,17 +1,16 @@
 package com.faceunity.nama.control;
 
 import android.content.Context;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.appcompat.widget.SwitchCompat;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.appcompat.widget.SwitchCompat;
-import androidx.recyclerview.widget.RecyclerView;
 
 import com.faceunity.core.utils.DecimalUtils;
 import com.faceunity.nama.R;
@@ -86,12 +85,6 @@ public class BodyBeautyControlView extends BaseControlView {
         setRecoverEnable(checkParamsChanged());
     }
 
-    public void updateOnSelected() {
-        if (switchCompat != null) {
-            boolean enabled = mDataFactory == null || mDataFactory.isBodyBeautyEnabled();
-            switchCompat.setChecked(enabled);
-        }
-    }
 
     private void initView() {
         recyclerView = findViewById(R.id.recycler_view);

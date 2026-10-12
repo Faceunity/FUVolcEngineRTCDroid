@@ -100,7 +100,7 @@ public class LoginActivity extends AppCompatActivity {
                     public void onDenied(@NonNull List<String> permissions, boolean doNotAskAgain) {
                     }
                 });
-        FUConfig.DEVICE_LEVEL = FuDeviceUtils.judgeDeviceLevelGPU();
+        FUConfig.DEVICE_LEVEL = FuDeviceUtils.judgeDeviceLevel(true);
     }
 
     private void joinChannel(String roomId, String userId) {
