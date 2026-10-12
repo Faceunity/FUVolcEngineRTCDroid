@@ -24,11 +24,13 @@ import com.faceunity.core.enumeration.FUAIProcessorEnum;
 import com.faceunity.core.faceunity.FURenderKit;
 import com.faceunity.core.faceunity.FURenderManager;
 import com.faceunity.core.utils.FULogger;
+import com.faceunity.nama.FUConfig;
 import com.faceunity.nama.FURenderer;
 import com.faceunity.nama.authpack;
 import com.faceunity.nama.data.FaceUnityDataFactory;
 import com.faceunity.nama.listener.FURendererListener;
 import com.faceunity.nama.ui.FaceUnityView;
+import com.faceunity.nama.utils.FuDeviceUtils;
 import com.ss.bytertc.engine.RTCRoom;
 import com.ss.bytertc.engine.RTCRoomConfig;
 import com.ss.bytertc.engine.RTCVideo;
@@ -188,6 +190,7 @@ public class RTCRoomActivity extends AppCompatActivity implements SensorEventLis
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_room);
+        FUConfig.DEVICE_LEVEL = FuDeviceUtils.judgeDeviceLevel(true);
 
         Intent intent = getIntent();
         String roomId = intent.getStringExtra(Constants.ROOM_ID_EXTRA);
@@ -227,7 +230,7 @@ public class RTCRoomActivity extends AppCompatActivity implements SensorEventLis
         mTvFace = findViewById(R.id.tv_face);
         mFaceUnityDataFactory = new FaceUnityDataFactory(-1);
         faceUnityView.bindDataFactory(mFaceUnityDataFactory);
-        mFURenderer.bindListener(new FURendererListener() {
+        mFURenderer.prepareRenderer(new FURendererListener() {
             @Override
             public void onPrepare() {
                 initCsvUtil(RTCRoomActivity.this);
@@ -245,13 +248,6 @@ public class RTCRoomActivity extends AppCompatActivity implements SensorEventLis
             @Override
             public void onFpsChanged(double fps, double callTime) {
 //                Log.d(TAG, "onFpsChanged: fps: " + fps + " ,callTime:" + callTime);
-            }
-
-            @Override
-            public void onProcessTime(long processTime) {
-                if (mCSVUtils != null) {
-                    mCSVUtils.writeCsv(null, processTime);
-                }
             }
 
             @Override
@@ -432,9 +428,8 @@ public class RTCRoomActivity extends AppCompatActivity implements SensorEventLis
     protected void onDestroy() {
         super.onDestroy();
 
-        if(mCustomVideoProcessor != null) {
-            mCustomVideoProcessor.mFURenderer.removeListener();
-        }
+        mFURenderer.release();
+        mCSVUtils.close();
         mSensorManager.unregisterListener(this);
 
         // 离开房间

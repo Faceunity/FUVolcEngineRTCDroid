@@ -1,10 +1,11 @@
 package com.faceunity.nama.data;
 
-import com.faceunity.nama.FUConfig;
 import com.faceunity.core.enumeration.FUAIProcessorEnum;
 import com.faceunity.core.faceunity.FUAIKit;
 import com.faceunity.core.faceunity.FURenderKit;
+import com.faceunity.nama.FUConfig;
 import com.faceunity.nama.FURenderer;
+import com.faceunity.nama.repo.FaceBeautySource;
 import com.faceunity.nama.utils.FuDeviceUtils;
 
 /**
@@ -56,8 +57,11 @@ public class FaceUnityDataFactory {
     public void bindCurrentRenderer(boolean needBindFaceBeauty) {
         hasFaceBeautyOrFilterLoaded = needBindFaceBeauty;
         //高端机开启小脸检测
-        FUAIKit.getInstance().faceProcessorSetFaceLandmarkQuality(FUConfig.DEVICE_LEVEL);
-        if (FUConfig.DEVICE_LEVEL  > FuDeviceUtils.DEVICE_LEVEL_TWO)
+        FUAIKit.getInstance().faceProcessorSetFaceLandmarkQuality(FUConfig.DEVICE_LEVEL >= 2 ? 2 : 1);
+        // 高精度增强遮挡默认关闭，用户主动开启
+        FUAIKit.getInstance().fuFaceProcessorSetFaceLandmarkHpOccu(0);
+        FURenderKit.getInstance().setDynamicQualityControl(FUConfig.DEVICE_LEVEL <= FuDeviceUtils.DEVICE_LEVEL_ONE);
+        if (FUConfig.DEVICE_LEVEL  > FuDeviceUtils.DEVICE_LEVEL_ONE)
             FUAIKit.getInstance().fuFaceProcessorSetDetectSmallFace(true);
         //选中哪一项加载哪一项道具
         switch (currentFunctionIndex) {
@@ -82,7 +86,7 @@ public class FaceUnityDataFactory {
                 break;
         }
         //补充没有选中某项但是需要做效果则靠下面这个逻辑
-        if (hasFaceBeautyOrFilterLoaded) {
+        if (hasFaceBeautyOrFilterLoaded && (currentFunctionIndex != 0 || currentFunctionIndex != 1 ||currentFunctionIndex != 2)) {
             mFaceBeautyAndFilterDataFactory.bindCurrentRenderer();
         }
         if (hasPropLoaded && currentFunctionIndex != 3) {
@@ -102,6 +106,7 @@ public class FaceUnityDataFactory {
             mFURenderKit.getFUAIController().setMaxFaces(4);
             mFURenderer.setAIProcessTrackType(FUAIProcessorEnum.FACE_PROCESSOR);
         }
+        mFURenderKit.enableWarpAntiAlias(FaceBeautySource.BUNDLE_FACE_BEAUTIFICATION, FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_ONE);
     }
 
     /**
@@ -145,5 +150,10 @@ public class FaceUnityDataFactory {
                 mFURenderer.setAIProcessTrackType(FUAIProcessorEnum.HUMAN_PROCESSOR);
                 break;
         }
+        mFURenderKit.enableWarpAntiAlias(FaceBeautySource.BUNDLE_FACE_BEAUTIFICATION, FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_ONE);
+    }
+
+    public boolean isEnableMakeup() {
+        return mMakeupDataFactory.isEnableMakeup();
     }
 }

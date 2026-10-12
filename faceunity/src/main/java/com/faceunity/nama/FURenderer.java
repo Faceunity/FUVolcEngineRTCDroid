@@ -2,8 +2,7 @@ package com.faceunity.nama;
 
 import android.content.Context;
 import android.hardware.Camera;
-import android.os.Handler;
-import android.os.Looper;
+import android.util.Log;
 
 import com.faceunity.core.callback.OperateCallback;
 import com.faceunity.core.entity.FURenderInputData;
@@ -12,16 +11,20 @@ import com.faceunity.core.enumeration.CameraFacingEnum;
 import com.faceunity.core.enumeration.FUAIProcessorEnum;
 import com.faceunity.core.enumeration.FUAITypeEnum;
 import com.faceunity.core.enumeration.FUTransformMatrixEnum;
+import com.faceunity.core.faceunity.AICommonData;
 import com.faceunity.core.faceunity.FUAIKit;
 import com.faceunity.core.faceunity.FURenderConfig;
 import com.faceunity.core.faceunity.FURenderKit;
 import com.faceunity.core.faceunity.FURenderManager;
-import com.faceunity.core.model.facebeauty.FaceBeautyBlurTypeEnum;
 import com.faceunity.core.utils.CameraUtils;
 import com.faceunity.core.utils.FULogger;
 import com.faceunity.nama.listener.FURendererListener;
 import com.faceunity.nama.utils.FuDeviceUtils;
+
+import org.jetbrains.annotations.NotNull;
+
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 
 
@@ -31,6 +34,7 @@ import java.util.HashMap;
  */
 public class FURenderer extends IFURenderer {
 
+    private static final String TAG = "FURenderer";
 
     public volatile static FURenderer INSTANCE;
 
@@ -52,28 +56,35 @@ public class FURenderer extends IFURenderer {
 
 
     /* 特效FURenderKit*/
-    public  FURenderKit mFURenderKit = FURenderKit.getInstance();
-
+    private FURenderKit mFURenderKit = FURenderKit.getInstance();
     /* 特效FURenderKit*/
-    public final FUAIKit mFUAIKit = FUAIKit.getInstance();
+    private FUAIKit mFUAIKit = FUAIKit.getInstance();
 
     /* AI道具*/
-    private final String BUNDLE_AI_FACE = "model" + File.separator + "ai_face_processor.bundle";
-    private final String BUNDLE_AI_HUMAN = "model" + File.separator + "ai_human_processor.bundle";
+    private String BUNDLE_AI_FACE = "model" + File.separator + "ai_face_processor.bundle";
+    private String BUNDLE_AI_HUMAN = "model" + File.separator + "ai_human_processor.bundle";
 
     /* 相机角度-朝向映射 */
-    private final HashMap<Integer, CameraFacingEnum> cameraOrientationMap = new HashMap<>();
+    private HashMap<Integer, CameraFacingEnum> cameraOrientationMap = new HashMap<>();
+
+    /* GL 线程 ID */
+    private Long mGlThreadId = 0L;
+    /* 任务队列 */
+    private ArrayList<Runnable> mEventQueue = new ArrayList<>(16);
+    private final Object queueLock = new Object();
+    /* 渲染开关标识 */
+    private volatile boolean mRendererSwitch = false;
+    /* 清除队列标识 */
+    private volatile boolean mClearQueue = false;
+
 
     /*检测类型*/
-    private FUAIProcessorEnum aIProcess = FUAIProcessorEnum.HUMAN_PROCESSOR;
-
+    private FUAIProcessorEnum aIProcess = FUAIProcessorEnum.FACE_PROCESSOR;
     /*检测标识*/
     private int aIProcessTrackStatus = -1;
 
-    /**
-     *
-     * @return version
-     */
+    private boolean isCreateEGLContext;
+
     public String getVersion() {
         return mFURenderKit.getVersion();
     }
@@ -85,27 +96,42 @@ public class FURenderer extends IFURenderer {
      */
     @Override
     public void setup(Context context) {
-        FURenderManager.setKitDebug(FULogger.LogLevel.TRACE);
-        FURenderManager.setCoreDebug(FULogger.LogLevel.OFF);
+        FURenderManager.setKitDebug(FULogger.LogLevel.DEBUG);
+        FURenderManager.setCoreDebug(FULogger.LogLevel.DEBUG);
         FURenderManager.registerFURender(context, authpack.A(), new OperateCallback() {
             @Override
-            public void onSuccess(int errorCode, String errorMessage) {
-                FULogger.d("FURenderer","onSuccess errorCode:"+errorCode+",errorMessage:"+errorMessage);
-                if (errorCode == FURenderConfig.OPERATE_SUCCESS_AUTH) {
+            public void onSuccess(int i, @NotNull String s) {
+                if (i == FURenderConfig.OPERATE_SUCCESS_AUTH) {
+                    switch (FUConfig.DEVICE_LEVEL) {
+                        case FuDeviceUtils.DEVICE_LEVEL_MINUS_ONE:
+                        case FuDeviceUtils.DEVICE_LEVEL_ONE:
+                            FUAIKit.getInstance().fuSetFaceAlgorithmConfig(AICommonData.FUAIFACE_DISABLE_FACE_OCCU | AICommonData.FUAIFACE_DISABLE_SKIN_SEG | AICommonData.FUAIFACE_DISABLE_DEL_SPOT | AICommonData.FUAIFACE_DISABLE_ARMESHV2 | AICommonData.FUAIFACE_DISABLE_RACE | AICommonData.FUAIFACE_DISABLE_LANDMARK_HP_OCCU);
+                            break;
+                        case FuDeviceUtils.DEVICE_LEVEL_TWO:
+                            FUAIKit.getInstance().fuSetFaceAlgorithmConfig(AICommonData.FUAIFACE_DISABLE_SKIN_SEG | AICommonData.FUAIFACE_DISABLE_DEL_SPOT | AICommonData.FUAIFACE_DISABLE_ARMESHV2 | AICommonData.FUAIFACE_DISABLE_RACE);
+                            break;
+                        case FuDeviceUtils.DEVICE_LEVEL_THREE:
+                            FUAIKit.getInstance().fuSetFaceAlgorithmConfig(AICommonData.FUAIFACE_DISABLE_SKIN_SEG);
+                            break;
+                        case FuDeviceUtils.DEVICE_LEVEL_FOUR:
+                            FUAIKit.getInstance().fuSetFaceAlgorithmConfig(AICommonData.FUAIFACE_ENABLE_ALL);
+                            break;
+                    }
+
                     mFUAIKit.loadAIProcessor(BUNDLE_AI_FACE, FUAITypeEnum.FUAITYPE_FACEPROCESSOR);
                     mFUAIKit.loadAIProcessor(BUNDLE_AI_HUMAN, FUAITypeEnum.FUAITYPE_HUMAN_PROCESSOR);
-
                     int cameraFrontOrientation = CameraUtils.INSTANCE.getCameraOrientation(Camera.CameraInfo.CAMERA_FACING_FRONT);
                     int cameraBackOrientation = CameraUtils.INSTANCE.getCameraOrientation(Camera.CameraInfo.CAMERA_FACING_BACK);
                     cameraOrientationMap.put(cameraFrontOrientation, CameraFacingEnum.CAMERA_FRONT);
                     cameraOrientationMap.put(cameraBackOrientation, CameraFacingEnum.CAMERA_BACK);
+                    Log.d(TAG, "onSuccess: " + cameraOrientationMap);
                 }
             }
 
             @Override
-            public void onFail(int errorCode, String errorMessage) {
-                FULogger.d("FURenderer","onSuccess errorCode:"+errorCode+",errorMessage:"+errorMessage);
+            public void onFail(int i, @NotNull String s) {
             }
+
         });
     }
 
@@ -113,70 +139,23 @@ public class FURenderer extends IFURenderer {
      * 开启合成状态
      */
     @Override
-    public void bindListener(FURendererListener mFURendererListener) {
-        FULogger.d("FURenderer","bindListener");
+    public void prepareRenderer(FURendererListener mFURendererListener) {
         this.mFURendererListener = mFURendererListener;
-    }
-
-
-    /**
-     * 单输入接口，输入texture，必须在具有 GL 环境的线程调用
-     *
-     * @param texId  纹理 ID
-     * @param width  宽
-     * @param height 高
-     * @return 0
-     */
-    public int onDrawFrameSingleInput(int texId, int width, int height) {
-//        FULogger.d("FURenderer","onDrawFrameSingleInput texId:"+texId+",width:"+width+",height:"+height);
-        prepareDrawFrame();
-
-        FURenderInputData inputData = new FURenderInputData(width, height);
-        inputData.setTexture(new FURenderInputData.FUTexture(inputTextureType, texId));
-        FURenderInputData.FURenderConfig config = inputData.getRenderConfig();
-        config.setExternalInputType(externalInputType);
-        config.setInputOrientation(inputOrientation);
-        config.setDeviceOrientation(deviceOrientation);
-        config.setInputBufferMatrix(inputBufferMatrix);
-        config.setInputTextureMatrix(inputTextureMatrix);
-        config.setCameraFacing(cameraFacing);
-        config.setOutputMatrix(outputMatrix);
-        mCallStartTime = System.nanoTime();
-        if (FUConfig.DEVICE_LEVEL > FuDeviceUtils.DEVICE_LEVEL_TWO)//高性能设备
-            cheekFaceNum();
-        FURenderOutputData outputData = mFURenderKit.renderWithInput(inputData);
-        mSumCallTime += System.nanoTime() - mCallStartTime;
-        if (outputData.getTexture() != null && outputData.getTexture().getTexId() > 0) {
-            return outputData.getTexture().getTexId();
-        }
-        return 0;
-    }
-
-    /**
-     * 检查当前人脸数量
-     */
-    public void cheekFaceNum() {
-//        FULogger.d("FURenderer","cheekFaceNum");
-        //根据有无人脸 + 设备性能 判断开启的磨皮类型
-        float faceProcessorGetConfidenceScore = FUAIKit.getInstance().getFaceProcessorGetConfidenceScore(0);
-        if (faceProcessorGetConfidenceScore >= 0.95) {
-            //高端手机并且检测到人脸开启均匀磨皮，人脸点位质
-            if (FURenderKit.getInstance().getFaceBeauty() != null && FURenderKit.getInstance().getFaceBeauty().getBlurType() != FaceBeautyBlurTypeEnum.EquallySkin) {
-                FURenderKit.getInstance().getFaceBeauty().setBlurType(FaceBeautyBlurTypeEnum.EquallySkin);
-                FURenderKit.getInstance().getFaceBeauty().setEnableBlurUseMask(true);
-            }
-        } else {
-            if (FURenderKit.getInstance().getFaceBeauty() != null && FURenderKit.getInstance().getFaceBeauty().getBlurType() != FaceBeautyBlurTypeEnum.FineSkin) {
-                FURenderKit.getInstance().getFaceBeauty().setBlurType(FaceBeautyBlurTypeEnum.FineSkin);
-                FURenderKit.getInstance().getFaceBeauty().setEnableBlurUseMask(false);
-            }
+        mRendererSwitch = true;
+        mClearQueue = false;
+        queueEvent(() -> mGlThreadId = Thread.currentThread().getId());
+        mFURendererListener.onPrepare();
+        if (isCreateEGLContext) {
+            mFURenderKit.createEGLContext();
         }
     }
+
 
     /**
      * 双输入接口，输入 buffer 和 texture，必须在具有 GL 环境的线程调用
      * 由于省去数据拷贝，性能相对最优，优先推荐使用。
      * 缺点是无法保证 buffer 和纹理对齐，可能出现点位和效果对不上的情况。
+     *
      * @param img    NV21 buffer
      * @param texId  纹理 ID
      * @param width  宽
@@ -185,11 +164,46 @@ public class FURenderer extends IFURenderer {
      */
     @Override
     public int onDrawFrameDualInput(byte[] img, int texId, int width, int height) {
-//        FULogger.d("FURenderer","onDrawFrameDualInput texId:"+texId+",width:"+width+",height:"+height);
         prepareDrawFrame();
+        if (!mRendererSwitch) {
+            return texId;
+        }
         FURenderInputData inputData = new FURenderInputData(width, height);
-        /*注释掉Buffer配置，启用单纹理模式，防止Buffer跟纹理存在不对齐造成，美妆偏移*/
-//        inputData.setImageBuffer(new FURenderInputData.FUImageBuffer(inputBufferType, img));//设置为单Buffer输入
+        if (img != null) {
+            inputData.setImageBuffer(new FURenderInputData.FUImageBuffer(inputBufferType, img));
+        }
+        if (texId != -1) {
+            inputData.setTexture(new FURenderInputData.FUTexture(inputTextureType, texId));
+        }
+        FURenderInputData.FURenderConfig config = inputData.getRenderConfig();
+        config.setExternalInputType(externalInputType);
+        config.setInputOrientation(inputOrientation);
+        config.setDeviceOrientation(deviceOrientation);
+        config.setInputBufferMatrix(inputBufferMatrix);
+        config.setInputTextureMatrix(inputTextureMatrix);
+        config.setCameraFacing(cameraFacing);
+        config.setOutputMatrix(outputMatrix);
+        mCallStartTime = System.nanoTime();
+        FURenderOutputData outputData = mFURenderKit.renderWithInput(inputData);
+        mSumCallTime += System.nanoTime() - mCallStartTime;
+        if (outputData.getTexture() != null && outputData.getTexture().getTexId() > 0) {
+            return outputData.getTexture().getTexId();
+        }
+        return texId;
+    }
+
+
+    public int onDrawFrameSingleInput(int texId, int width, int height) {
+        return onDrawFrameDualInput(null, texId, width, height);
+    }
+
+    public FURenderOutputData onDrawFrameInputWithReturn(byte[] img, int texId, int width, int height) {
+        prepareDrawFrame();
+        if (!mRendererSwitch) {
+            return null;
+        }
+        FURenderInputData inputData = new FURenderInputData(width, height);
+        inputData.setImageBuffer(new FURenderInputData.FUImageBuffer(inputBufferType, img));
         inputData.setTexture(new FURenderInputData.FUTexture(inputTextureType, texId));
         FURenderInputData.FURenderConfig config = inputData.getRenderConfig();
         config.setExternalInputType(externalInputType);
@@ -197,44 +211,60 @@ public class FURenderer extends IFURenderer {
         config.setDeviceOrientation(deviceOrientation);
         config.setInputBufferMatrix(inputBufferMatrix);
         config.setInputTextureMatrix(inputTextureMatrix);
-        config.setOutputMatrix(outputMatrix);
         config.setCameraFacing(cameraFacing);
+        config.setOutputMatrix(outputMatrix);
+        config.setNeedBufferReturn(true);
         mCallStartTime = System.nanoTime();
         FURenderOutputData outputData = mFURenderKit.renderWithInput(inputData);
-        long processTime = System.nanoTime() - mCallStartTime;
-        mSumCallTime += processTime;
-        if (mFURendererListener != null) {
-            mFURendererListener.onProcessTime(processTime);
-        }
-        if (outputData.getTexture() != null && outputData.getTexture().getTexId() > 0) {
-            return outputData.getTexture().getTexId();
-        }
-        return texId;
-
+        mSumCallTime += System.nanoTime() - mCallStartTime;
+        return outputData;
     }
 
-    public void init(){
-        FULogger.d("FURenderer","init");
-        if (mFURendererListener != null) {
-            mFURendererListener.onPrepare();
+    public void setCreateEGLContext(boolean createEGLContext) {
+        isCreateEGLContext = createEGLContext;
+    }
+
+    /**
+     * 类似 GLSurfaceView 的 queueEvent 机制，把任务抛到 GL 线程执行。
+     *
+     * @param runnable
+     */
+    @Override
+    public void queueEvent(Runnable runnable) {
+        if (runnable == null) {
+            return;
+        }
+        if (mGlThreadId == Thread.currentThread().getId()) {
+            runnable.run();
+        } else {
+            synchronized (queueLock) {
+                mEventQueue.add(runnable);
+            }
         }
     }
+
 
     /**
      * 释放资源
      */
     @Override
     public void release() {
-        FULogger.d("FURenderer","release");
-        mFURenderKit.release();
-        aIProcessTrackStatus = -1;
-        if (mFURendererListener != null) {
-            mFURendererListener.onRelease();
+        mRendererSwitch = false;
+        mClearQueue = true;
+        mGlThreadId = 0L;
+        synchronized (queueLock) {
+            mEventQueue.clear();
+            mClearQueue = false;
+            mFURenderKit.release();
+            aIProcessTrackStatus = -1;
+            if (mFURendererListener != null) {
+                mFURendererListener.onRelease();
+                mFURendererListener = null;
+            }
         }
-    }
-
-    public void removeListener() {
-        mFURendererListener = null;
+        if (isCreateEGLContext) {
+            mFURenderKit.releaseEGLContext();
+        }
     }
 
 
@@ -244,46 +274,16 @@ public class FURenderer extends IFURenderer {
      * @return
      */
     private void prepareDrawFrame() {
-//        FULogger.d("FURenderer","prepareDrawFrame");
         benchmarkFPS();
-        // AI检测
-        trackStatus();
-    }
 
-    //region AI识别
-    /**
-     * 设置输入数据朝向
-     *
-     * @param inputOrientation
-     */
-    @Override
-    public void setInputOrientation(int inputOrientation) {
-        FULogger.d("FURenderer","setInputOrientation inputOrientation:"+inputOrientation);
-        if (cameraOrientationMap.containsKey(inputOrientation)) {
-            CameraFacingEnum cameraFacingEnum = cameraOrientationMap.get(inputOrientation);
-            if (cameraFacingEnum == CameraFacingEnum.CAMERA_FRONT) {
-                setInputBufferMatrix(FUTransformMatrixEnum.CCROT0);
-                setInputTextureMatrix(FUTransformMatrixEnum.CCROT0);
-                setOutputMatrix(FUTransformMatrixEnum.CCROT0_FLIPVERTICAL);
-                setCameraFacing(CameraFacingEnum.CAMERA_BACK);
-            } else {
-                setInputBufferMatrix(FUTransformMatrixEnum.CCROT0_FLIPHORIZONTAL);
-                setInputTextureMatrix(FUTransformMatrixEnum.CCROT0_FLIPHORIZONTAL);
-                setOutputMatrix(FUTransformMatrixEnum.CCROT180);
-                setCameraFacing(CameraFacingEnum.CAMERA_FRONT);
+        // 执行任务队列中的任务
+        synchronized (queueLock) {
+            while (!mEventQueue.isEmpty() && !mClearQueue) {
+                mEventQueue.remove(0).run();
             }
         }
-        super.setInputOrientation(inputOrientation);
-    }
-
-    @Override
-    public void setDeviceOrientation(int deviceOrientation) {
-        FULogger.d("FURenderer","setDeviceOrientation deviceOrientation:"+deviceOrientation);
-        if (cameraFacing == CameraFacingEnum.CAMERA_BACK) {
-            if (deviceOrientation == 0) deviceOrientation = 180;
-            if (deviceOrientation == 180) deviceOrientation = 0;
-        }
-        super.setDeviceOrientation(deviceOrientation);
+        // AI检测
+        trackStatus();
     }
 
     /**
@@ -293,7 +293,6 @@ public class FURenderer extends IFURenderer {
      */
     @Override
     public void setAIProcessTrackType(FUAIProcessorEnum type) {
-        FULogger.d("FURenderer","setAIProcessTrackType type:"+type.name());
         aIProcess = type;
         aIProcessTrackStatus = -1;
     }
@@ -305,16 +304,36 @@ public class FURenderer extends IFURenderer {
      */
     @Override
     public void setMarkFPSEnable(boolean enable) {
-//        FULogger.d("FURenderer","setMarkFPSEnable enable:"+enable);
         mIsRunBenchmark = enable;
     }
 
+    @Override
+    public void setDeviceOrientation(int deviceOrientation) {
+        super.setDeviceOrientation(deviceOrientation);
+    }
+
+    @Override
+    public void setInputOrientation(int inputOrientation) {
+        if (cameraOrientationMap.containsKey(inputOrientation)) {
+            CameraFacingEnum cameraFacingEnum = cameraOrientationMap.get(inputOrientation);
+            setCameraFacing(cameraFacingEnum);
+            if (cameraFacingEnum == CameraFacingEnum.CAMERA_FRONT) {
+                setInputBufferMatrix(FUTransformMatrixEnum.CCROT0_FLIPVERTICAL);
+                setInputTextureMatrix(FUTransformMatrixEnum.CCROT0_FLIPVERTICAL);
+                setOutputMatrix(FUTransformMatrixEnum.CCROT0);
+            } else {
+                setInputBufferMatrix(FUTransformMatrixEnum.CCROT0);
+                setInputTextureMatrix(FUTransformMatrixEnum.CCROT0);
+                setOutputMatrix(FUTransformMatrixEnum.CCROT0_FLIPVERTICAL);
+            }
+        }
+        super.setInputOrientation(inputOrientation);
+    }
 
     /**
      * AI识别数目检测
      */
     private void trackStatus() {
-        FULogger.d("FURenderer","trackStatus aIProcess:"+aIProcess);
         int trackCount;
         if (aIProcess == FUAIProcessorEnum.HAND_GESTURE_PROCESSOR) {
             trackCount = mFURenderKit.getFUAIController().handProcessorGetNumResults();
@@ -323,7 +342,6 @@ public class FURenderer extends IFURenderer {
         } else {
             trackCount = mFURenderKit.getFUAIController().isTracking();
         }
-        FULogger.d("FURenderer","trackStatus trackCount:"+trackCount);
         if (trackCount != aIProcessTrackStatus) {
             aIProcessTrackStatus = trackCount;
         } else {
@@ -347,11 +365,9 @@ public class FURenderer extends IFURenderer {
     private long mCallStartTime;
 
     private void benchmarkFPS() {
-//        FULogger.d("FURenderer","benchmarkFPS mIsRunBenchmark:"+mIsRunBenchmark);
         if (!mIsRunBenchmark) {
             return;
         }
-//        FULogger.d("FURenderer","benchmarkFPS mCurrentFrameCount:"+mCurrentFrameCount+",FRAME_COUNT:"+FRAME_COUNT);
         if (++mCurrentFrameCount == FRAME_COUNT) {
             long tmp = System.nanoTime();
             double fps = (double) NANO_IN_ONE_SECOND / ((double) (tmp - mLastFrameTimestamp) / FRAME_COUNT);

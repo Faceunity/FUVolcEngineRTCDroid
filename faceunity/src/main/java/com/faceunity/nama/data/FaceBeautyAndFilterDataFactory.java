@@ -154,14 +154,6 @@ public class FaceBeautyAndFilterDataFactory extends AbstractFaceBeautyDataFactor
         }
     }
 
-    @Override
-    public boolean isFaceBeautyEnabled() {
-        if (mFURenderKit.getFaceBeauty() != null) {
-            return mFURenderKit.getFaceBeauty().getEnable();
-        }
-        return true;
-    }
-
     /**
      * 获取模型参数
      *
@@ -186,6 +178,21 @@ public class FaceBeautyAndFilterDataFactory extends AbstractFaceBeautyDataFactor
     public void updateParamIntensity(@NonNull String key, double value) {
         if (faceBeautySetMapping.containsKey(key)) {
             faceBeautySetMapping.get(key).setValue(value);
+        }
+    }
+
+    @Override
+    public int getParamRelevanceSelectedType(@NonNull String key) {
+        if (faceBeautyRelevanceGetMapping != null && faceBeautyRelevanceGetMapping.containsKey(key)) {
+            return faceBeautyRelevanceGetMapping.get(key).getValue() ? 1 : 0;
+        }
+        return 0;
+    }
+
+    @Override
+    public void updateParamRelevanceType(@NonNull String key, int type) {
+        if (faceBeautyRelevanceSetMapping.containsKey(key)) {
+            faceBeautyRelevanceSetMapping.get(key).setValue(type == 1);
         }
     }
 

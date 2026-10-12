@@ -1,12 +1,12 @@
 package com.faceunity.nama.ui;
 
 import android.content.Context;
+import androidx.annotation.Nullable;
+
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.LinearLayout;
-
-import androidx.annotation.Nullable;
 
 import com.faceunity.nama.R;
 import com.faceunity.nama.checkbox.CheckGroup;
@@ -17,6 +17,7 @@ import com.faceunity.nama.control.FilterControlView;
 import com.faceunity.nama.control.MakeupControlView;
 import com.faceunity.nama.control.PropControlView;
 import com.faceunity.nama.data.FaceUnityDataFactory;
+import com.faceunity.nama.dialog.ToastHelper;
 
 /**
  * DESC：
@@ -55,6 +56,7 @@ public class FaceUnityView extends LinearLayout {
     private PropControlView mPropControlView;//道具菜单
     private BodyBeautyControlView mBodyBeautyControlView;//美体菜单
     private View lineView;//分割线
+    private int mLastCheckId = View.NO_ID;
 
 
     private void init() {
@@ -99,6 +101,8 @@ public class FaceUnityView extends LinearLayout {
                 mCheckGroupView.check(R.id.radio_body);
                 break;
         }
+        mLastCheckId = mCheckGroupView.getCheckedCheckBoxId();
+        enableMakeup(dataFactory.isEnableMakeup());
     }
 
     /**
@@ -134,14 +138,20 @@ public class FaceUnityView extends LinearLayout {
                 showFunction(3);
                 mDataFactory.onFunctionSelected(3);
             } else if (checkedId == R.id.radio_makeup) {
-                showFunction(4);
-                mDataFactory.onFunctionSelected(4);
+                if (mDataFactory.isEnableMakeup()) {
+                    showFunction(4);
+                    mDataFactory.onFunctionSelected(4);
+                }else {
+                    ToastHelper.showNormalToast(mContext, mDataFactory.mMakeupDataFactory.disableMessage());
+                    mCheckGroupView.check(mLastCheckId);
+                }
             } else if (checkedId == R.id.radio_body) {
                 showFunction(5);
                 mDataFactory.onFunctionSelected(5);
             } else {
                 showFunction(-1);
             }
+            mLastCheckId = mCheckGroupView.getCheckedCheckBoxId();
         });
     }
 
@@ -152,20 +162,15 @@ public class FaceUnityView extends LinearLayout {
      */
     private void showFunction(int index) {
         mFaceBeautySkinControlView.setVisibility((index == 0) ? View.VISIBLE : View.GONE);
-        if (index == 0) {
-            mFaceBeautySkinControlView.updateOnSelected();
-        }
         mFaceBeautyShapeControlView.setVisibility((index == 1) ? View.VISIBLE : View.GONE);
-        if (index == 1) {
-            mFaceBeautyShapeControlView.updateOnSelected();
-        }
         mFilterControlView.setVisibility((index == 2) ? View.VISIBLE : View.GONE);
         mPropControlView.setVisibility((index == 3) ? View.VISIBLE : View.GONE);
         mMakeupControlView.setVisibility((index == 4) ? View.VISIBLE : View.GONE);
         mBodyBeautyControlView.setVisibility((index == 5) ? View.VISIBLE : View.GONE);
-        if (index == 5) {
-            mBodyBeautyControlView.updateOnSelected();
-        }
         lineView.setVisibility((index != -1) ? View.VISIBLE : View.GONE);
+    }
+
+    private void enableMakeup(boolean enable) {
+        findViewById(R.id.radio_makeup).setAlpha(enable ? 1.0f : 0.5f);
     }
 }

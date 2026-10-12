@@ -1,12 +1,11 @@
 package com.faceunity.nama.widget;
 
 import android.content.Context;
+import androidx.annotation.Nullable;
+import androidx.appcompat.widget.AppCompatImageView;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
-
-import androidx.annotation.Nullable;
-import androidx.appcompat.widget.AppCompatImageView;
 
 
 /**
